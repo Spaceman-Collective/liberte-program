@@ -14,3 +14,8 @@ pub struct CloseNodeEvent{
     pub port:u16,
     pub timestamp:u64
 }
+#[event]
+pub struct ClaimNodeEvent{
+    pub index:u64,
+    pub timestamp:u64
+}

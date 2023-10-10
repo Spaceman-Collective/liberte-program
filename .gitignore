@@ -6,3 +6,7 @@ target
 node_modules
 test-ledger
 .yarn
+/.idea/.gitignore
+/.idea/liberte-program.iml
+/.idea/modules.xml
+/.idea/vcs.xml

@@ -2,8 +2,9 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{
     self, InitializeAccount, Mint, SetAuthority, Token, TokenAccount, Transfer,
 };
+use std::convert::TryInto;
 use crate::errors::LibreteError::InvalidAuthority;
-declare_id!("4bXLmkHeyEuJYWLanTNCjd9xgkzK1sy2ud4TkUAXFEbk");
+declare_id!("H5JnjsAu4yYNnY3fHxTTA2ySnYqqf2uAWK2QHJKPBMho");
 
 mod account;
 mod constant;
@@ -25,6 +26,7 @@ pub mod liberte_program {
         settings.all_node = 0;
         settings.active_node = 0;
         settings.authority = ctx.accounts.authority.key();
+        settings.reward_mint = ctx.accounts.mint.key();
         settings.whitelist = [0; 32];
         settings.blacklist = [0; 32];
         settings.reserved = [0; 32];
@@ -65,15 +67,30 @@ pub mod liberte_program {
         Ok(())
     }
 
-    // TODO: Update Node PDA to switch it's Active status or IP address/Key
-
-    // Checks ownership of DistributionNFT & Request PDA with Session and Verifier Nodes
-    // Request PDA also holds tokens that can be used to debit from by the Node
-    pub fn request_node(ctx: Context<RequestNode>) -> Result<()> {
+    pub fn claim_node(ctx: Context<ClaimNode>) -> Result<()> {
+        let setting = &mut ctx.accounts.settings;
+        let claim = &mut ctx.accounts.claim;
+        let node_index= get_random_u64(setting.all_node);
+        claim.authority = ctx.accounts.authority.key();
+        claim.init_stamp = ctx.accounts.clock.unix_timestamp as u64;
+        claim.index = node_index;
+        claim.bump = *ctx.bumps.get("claim").unwrap();
+        setting.active_node = setting.active_node.checked_add(1).unwrap();
+        /// TODO Verify CNFT Merkel
+        emit!(ClaimNodeEvent{
+            index:node_index,
+            timestamp:ctx.accounts.clock.unix_timestamp as u64
+        });
         Ok(())
     }
 }
-
+pub fn get_random_u64(max: u64) -> u64 {
+    let clock = Clock::get().unwrap();
+    let slice = &anchor_lang::solana_program::keccak::hash(&clock.slot.to_be_bytes()).to_bytes()[0..8];
+    let num: u64 = u64::from_be_bytes(slice.try_into().unwrap());
+    let target = num/(u64::MAX/max);
+    return target;
+}
 /*
 1. Allows nodes to register/deregister themselves by creating PDAs that point to their IP addresses (also allows updating their IP addresses)
 3. Node Request Ix that checks ownership of a distribution NFT and then picks a node to assign

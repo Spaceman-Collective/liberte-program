@@ -23,3 +23,10 @@ pub struct Node {
     pub active: bool,
     pub bump: u8
 }
+#[account]
+pub struct Claim {
+    pub authority: Pubkey,
+    pub init_stamp : u64,
+    pub index : u64,
+    pub bump: u8
+}

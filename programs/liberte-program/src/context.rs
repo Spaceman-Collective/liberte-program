@@ -79,4 +79,31 @@ pub struct CloseNode<'info> {
 
 #[derive(Accounts)]
 #[instruction(signature: String)]
-pub struct RequestNode {}
+pub struct ClaimNode<'info>  {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    #[account(mut, seeds=[PREFIX_SETTINGS], bump)]
+    pub settings: Account<'info, Settings>,
+    #[account(
+    init,
+    seeds=[PREFIX_CLAIM, authority.key().as_ref()],
+    bump,
+    payer=authority,
+    space=8+size_of::<Claim>()
+    )]
+    pub claim: Account<'info, Claim>,
+    #[account(
+    constraint = settings.reward_mint == mint.key() @InvalidAuthority
+    )]
+    pub mint: Account<'info, Mint>,
+    /// CHECKS: will cross check on IX
+    pub merkle_account: AccountInfo<'info>,
+    #[account(
+    constraint = token_ata.owner == authority.key() @InvalidAuthority,
+    constraint = token_ata.mint == mint.key() @InvalidAuthority,
+    )]
+    pub token_ata : Account<'info,TokenAccount>,
+    pub system_program: Program<'info, System>,
+    pub clock: Sysvar<'info, Clock>,
+    pub rent: Sysvar<'info, Rent>,
+}
