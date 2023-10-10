@@ -1,13 +1,19 @@
 use anchor_lang::prelude::*;
-
+use anchor_spl::token::{
+    self, InitializeAccount, Mint, SetAuthority, Token, TokenAccount, Transfer,
+};
+use crate::errors::LibreteError::InvalidAuthority;
 declare_id!("4bXLmkHeyEuJYWLanTNCjd9xgkzK1sy2ud4TkUAXFEbk");
 
 mod account;
 mod constant;
 mod context;
-mod error;
+mod errors;
+mod event;
 
 use crate::context::*;
+use crate::errors::*;
+use crate::event::*;
 
 #[program]
 pub mod liberte_program {
@@ -15,17 +21,50 @@ pub mod liberte_program {
 
     //Initialize creates the Settings PDA to track Node Counter
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        ctx.accounts.settings.node_count = 0;
+        let settings = &mut ctx.accounts.settings;
+        settings.all_node = 0;
+        settings.active_node = 0;
+        settings.authority = ctx.accounts.authority.key();
+        settings.whitelist = [0; 32];
+        settings.blacklist = [0; 32];
+        settings.reserved = [0; 32];
+        settings.bump = *ctx.bumps.get("settings").unwrap();
         Ok(())
     }
 
     //Create Node PDA
-    pub fn register_node(ctx: Context<RegisterNode>, ip_addr: String) -> Result<()> {
-        ctx.accounts.node.ip_addr = ip_addr;
-        ctx.accounts.node.active = true;
-        ctx.accounts.node.authority = ctx.accounts.node_signer.key();
+    pub fn register_node(ctx: Context<RegisterNode>, ip_addr: String,listen_port :u16,signature :String) -> Result<()> {
+        let node = &mut ctx.accounts.node;
+        let now = ctx.accounts.clock.unix_timestamp as u64;
+        node.listen_ip = ip_addr.clone();
+        node.listen_port = listen_port.clone();
+        node.active = true;
+        node.authority = ctx.accounts.authority.key();
+        node.init_stamp = now;
+        emit!(NewNodeEvent{
+            signer:ctx.accounts.authority.key(),
+            ip:ip_addr,
+            port:listen_port
+        });
+        Ok(())
+
+    }
+
+    pub fn close_node(ctx: Context<CloseNode>, signature :String) -> Result<()> {
+        let node = &mut ctx.accounts.node;
+        let setting = &mut ctx.accounts.settings;
+        let now = ctx.accounts.clock.unix_timestamp as u64;
+        require_keys_eq!(node.authority, ctx.accounts.authority.key());
+        setting.active_node = setting.active_node.checked_sub(1).unwrap();
+        emit!(CloseNodeEvent{
+            signer:ctx.accounts.authority.key(),
+            ip:node.listen_ip.clone(),
+            port:node.listen_port.clone(),
+            timestamp:now
+        });
         Ok(())
     }
+
     // TODO: Update Node PDA to switch it's Active status or IP address/Key
 
     // Checks ownership of DistributionNFT & Request PDA with Session and Verifier Nodes

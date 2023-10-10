@@ -2,30 +2,24 @@ use anchor_lang::prelude::*;
 
 use crate::constant::*;
 
-pub trait MaxSize {
-    fn get_max_size() -> usize;
-}
-
 #[account]
 pub struct Settings {
-    pub node_count: u64,
-}
-
-impl MaxSize for Settings {
-    fn get_max_size() -> usize {
-        return 8;
-    }
+    pub authority: Pubkey,
+    pub reward_mint: Pubkey,
+    pub all_node: u64,
+    pub active_node: u64,
+    pub whitelist:[u8;32],
+    pub blacklist:[u8;32],
+    pub reserved: [u8;32],
+    pub bump :u8
 }
 
 #[account]
 pub struct Node {
-    pub active: bool,
-    pub ip_addr: String,
     pub authority: Pubkey,
-}
-
-impl MaxSize for Node {
-    fn get_max_size() -> usize {
-        return 1 + IP_ADDR_SIZE + 32;
-    }
+    pub init_stamp : u64,
+    pub listen_ip: String,
+    pub listen_port: u16,
+    pub active: bool,
+    pub bump: u8
 }

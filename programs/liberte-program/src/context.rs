@@ -1,41 +1,82 @@
-use anchor_lang::prelude::*;
-
+use anchor_lang::{
+    prelude::*,
+    accounts::{
+        cpi_account::CpiAccount,
+        program_account::ProgramAccount
+    },
+    solana_program::{
+        address_lookup_table_account::AddressLookupTableAccount,
+        sysvar::instructions::{ID as IX_ID},
+        program::invoke_signed
+    }
+};
+use anchor_spl::token::{
+    self, InitializeAccount, Mint, SetAuthority, Token, TokenAccount, Transfer,
+};
 use crate::account::*;
 use crate::constant::*;
-
+use crate::errors::LibreteError::InvalidAuthority;
+use std::mem::size_of;
 #[derive(Accounts)]
 pub struct Initialize<'info> {
     #[account(mut)]
-    pub payer: Signer<'info>,
-    pub system_program: Program<'info, System>,
-
+    pub authority: Signer<'info>,
     #[account(
       init,
       seeds=[PREFIX_SETTINGS],
       bump,
-      payer=payer,
-      space=8+Settings::get_max_size()
+      payer=authority,
+      space=8+size_of::<Settings>()
     )]
     pub settings: Account<'info, Settings>,
+    pub mint: Account<'info, Mint>,
+    pub system_program: Program<'info, System>,
+    pub clock: Sysvar<'info, Clock>,
+    pub rent: Sysvar<'info, Rent>,
 }
 
 #[derive(Accounts)]
+#[instruction(signature: String)]
 pub struct RegisterNode<'info> {
     #[account(mut)]
-    pub payer: Signer<'info>,
-    pub system_program: Program<'info, System>,
-
+    pub authority: Signer<'info>,
+    #[account(mut, seeds=[PREFIX_SETTINGS], bump)]
     pub settings: Account<'info, Settings>,
-    pub node_signer: Signer<'info>,
     #[account(
       init,
-      seeds=[PREFIX_NODE, (settings.node_count+1).to_be_bytes().as_ref()],
+      seeds=[PREFIX_NODE, signature.as_bytes()],
       bump,
-      payer=payer,
-      space=8+Node::get_max_size()
+      payer=authority,
+      space=8+size_of::<Node>()
     )]
     pub node: Account<'info, Node>,
+    pub system_program: Program<'info, System>,
+    pub clock: Sysvar<'info, Clock>,
+    pub rent: Sysvar<'info, Rent>,
 }
 
 #[derive(Accounts)]
+#[instruction(signature: String)]
+pub struct CloseNode<'info> {
+    #[account(mut,
+    constraint = authority.key() == node.authority @InvalidAuthority
+    )]
+    pub authority: Signer<'info>,
+    #[account(mut, seeds=[PREFIX_SETTINGS], bump)]
+    pub settings: Account<'info, Settings>,
+    #[account(
+    mut,
+    seeds=[PREFIX_NODE, signature.as_bytes()],
+    bump,
+    close=authority,
+    )]
+    pub node: Account<'info, Node>,
+    pub system_program: Program<'info, System>,
+    pub clock: Sysvar<'info, Clock>,
+    pub rent: Sysvar<'info, Rent>,
+
+}
+
+#[derive(Accounts)]
+#[instruction(signature: String)]
 pub struct RequestNode {}
